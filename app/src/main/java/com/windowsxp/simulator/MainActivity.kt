@@ -504,7 +504,14 @@ private fun createDesktopWebView(): WebView {
     private fun closeBrowser(id: String) {
         browserDialogs[id]?.dismiss()
     }
-
+private inner class VideoPipBridge {
+    @android.webkit.JavascriptInterface
+    fun activar() {
+        runOnUiThread {
+            enterVideoPip()
+        }
+    }
+}
     private fun startKeepAliveService() {
         val intent = Intent(this, KeepAliveService::class.java)
 
