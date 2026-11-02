@@ -1,5 +1,8 @@
 package com.windowsxp.simulator
 
+import android.app.PictureInPictureParams
+import android.content.res.Configuration
+import android.util.Rational
 import android.Manifest
 import android.app.Activity
 import android.app.Dialog
@@ -545,6 +548,58 @@ class MainActivity : Activity() {
         } else {
             super.onBackPressed()
         }
+        private fun enterVideoPip() {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+        Toast.makeText(
+            this,
+            "La ventana flotante requiere Android 8.0 o posterior.",
+            Toast.LENGTH_LONG
+        ).show()
+        return
+    }
+
+    if (!packageManager.hasSystemFeature(
+            PackageManager.FEATURE_PICTURE_IN_PICTURE
+        )
+    ) {
+        Toast.makeText(
+            this,
+            "Este dispositivo no admite Picture-in-Picture.",
+            Toast.LENGTH_LONG
+        ).show()
+        return
+    }
+
+    try {
+        val params = PictureInPictureParams.Builder()
+            .setAspectRatio(Rational(16, 9))
+            .build()
+
+        enterPictureInPictureMode(params)
+    } catch (e: Exception) {
+        Toast.makeText(
+            this,
+            "No se pudo abrir la ventana flotante.",
+            Toast.LENGTH_LONG
+        ).show()
+    }
+}
+
+override fun onPictureInPictureModeChanged(
+    isInPictureInPictureMode: Boolean,
+    newConfig: Configuration
+) {
+    super.onPictureInPictureModeChanged(
+        isInPictureInPictureMode,
+        newConfig
+    )
+
+    if (isInPictureInPictureMode) {
+        window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+    } else {
+        hideSystemBars()
+    }
+}
     }
 
     override fun onDestroy() {
