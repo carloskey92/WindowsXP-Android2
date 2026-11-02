@@ -1,0 +1,104 @@
+<!DOCTYPE html><html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Windows XP Simulator</title><style>
+*{box-sizing:border-box}
+body{margin:0;font:12px Tahoma,Arial,sans-serif;overflow:hidden}
+button,input,textarea{font-family:Tahoma,Arial,sans-serif}
+button{cursor:pointer}
+#desktop{position:fixed;inset:0 0 38px;background:linear-gradient(155deg,#168bd0,#0861ae 60%,#07509a);overflow:hidden}
+.desktop-icons{position:absolute;top:12px;left:8px;display:flex;flex-direction:column;gap:15px}
+.desktop-icon{width:82px;min-height:67px;padding:5px 2px;color:white;background:transparent;border:1px solid transparent;text-shadow:1px 1px 2px #000;text-align:center}
+.desktop-icon:hover{background:#ffffff30;border:1px dotted white}
+.desktop-icon .emoji{display:block;font-size:30px;margin-bottom:5px;text-shadow:none}
+.window{position:absolute;left:13%;top:7%;width:min(900px,82vw);height:min(620px,80vh);min-width:280px;min-height:210px;display:none;flex-direction:column;overflow:hidden;border:3px solid #1260cb;border-radius:8px 8px 0 0;background:#ece9d8;box-shadow:3px 4px 12px #0007}
+.window.active{display:flex}
+.titlebar{height:30px;min-height:30px;padding:3px 5px 3px 8px;display:flex;align-items:center;justify-content:space-between;gap:5px;color:white;font-weight:bold;cursor:move;user-select:none;background:linear-gradient(#3397f9,#0754c7 55%,#2878e7)}
+.title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.win-controls{display:flex;gap:3px}
+.win-controls button{width:23px;height:21px;padding:0;color:white;font-weight:bold;border:1px solid white;border-radius:3px;background:linear-gradient(#72b5f9,#1765d9)}
+.win-controls .close{background:linear-gradient(#ffad91,#d52c10)}
+.content{flex:1;min-height:0;display:flex;flex-direction:column;background:white;overflow:hidden}
+.browser-menu{display:flex;flex-wrap:wrap;gap:2px;padding:3px;background:#ece9d8;border-bottom:1px solid #c6c2b8}
+.browser-menu button{padding:5px 8px;border:1px solid transparent;background:transparent}
+.browser-menu button:hover{border-color:#8bb5e8;background:#dceaff}
+.browser-toolbar{display:flex;align-items:center;gap:4px;padding:5px;background:#ece9d8;border-bottom:1px solid #c6c2b8}
+.browser-toolbar button{flex-shrink:0;min-width:30px;height:30px;padding:3px 7px;border:1px solid #aaa;border-radius:3px;background:linear-gradient(white,#dedbd0)}
+.browser-toolbar button:hover{background:#dceaff}
+.address-form{flex:1;min-width:0;display:flex;gap:4px}
+.address{width:100%;min-width:0;height:29px;padding:5px 7px;border:1px solid #888;background:white;font-size:12px}
+.status{padding:4px 7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:#f4f2e9;border-bottom:1px solid #ccc}
+.browser-frame{flex:1;width:100%;height:100%;min-height:0;border:0;background:white}
+.notepad-menu{padding:6px;background:#ece9d8;border-bottom:1px solid #bbb}
+.notepad-text{flex:1;width:100%;resize:none;padding:10px;border:0;outline:none;font:14px Consolas,monospace}
+.calculator{width:280px;max-width:100%;margin:auto;padding:12px;background:#ece9d8}
+.calc-display{width:100%;height:43px;margin-bottom:10px;text-align:right;font-size:22px;border:2px inset #ddd;background:white}
+.calc-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}
+.calc-grid button{height:42px;font-size:16px;border:1px solid #999;border-radius:3px;background:linear-gradient(white,#ddd)}
+#taskbar{position:fixed;z-index:2000;bottom:0;left:0;right:0;height:38px;display:flex;align-items:center;gap:5px;padding:3px 5px;color:white;background:linear-gradient(#3b8df5,#1763d8 45%,#124dbb);border-top:1px solid #75aafa}
+#startButton{height:32px;min-width:90px;padding:0 12px;color:white;font-weight:bold;font-size:14px;border:1px solid #388c24;border-radius:0 14px 14px 0;background:linear-gradient(#65c849,#23810e)}
+.task-button{height:29px;max-width:155px;min-width:45px;padding:4px 8px;color:white;border:1px solid #ffffff40;border-radius:3px;background:#ffffff25;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.task-button.selected{background:#103f9a;box-shadow:inset 1px 1px 3px #0005}
+#clock{margin-left:auto;min-width:60px;text-align:center;padding:7px 5px;background:#0002}
+#startMenu{display:none;position:fixed;z-index:2100;bottom:38px;left:4px;width:285px;max-width:calc(100vw - 8px);border:2px solid #245edb;border-radius:7px 7px 0 0;background:#f0efe5;box-shadow:3px -3px 10px #0004}
+#startMenu.open{display:block}
+.start-header{padding:13px;color:white;font-size:17px;font-weight:bold;background:linear-gradient(110deg,#1763d8,#55a1f7)}
+.start-items{padding:6px}
+.start-item{display:block;width:100%;padding:10px;text-align:left;border:0;background:transparent;color:#222}
+.start-item:hover{color:white;background:#316ac5}
+.programs{position:relative}
+.submenu{display:none;position:absolute;left:calc(100% - 3px);bottom:-5px;width:190px;padding:5px;background:#f0efe5;border:2px solid #245edb;box-shadow:3px 3px 8px #0004}
+.programs:hover .submenu,.programs:focus-within .submenu{display:block}
+.start-footer{text-align:right;padding:7px;background:#d9e8fb;border-top:1px solid #b8cce8}
+@media(max-width:650px){.window{left:1%;top:2%;width:98%;height:94%;min-width:0;min-height:0}.desktop-icons{gap:7px}.desktop-icon{width:70px;min-height:58px;font-size:11px}.desktop-icon .emoji{font-size:26px}.browser-toolbar{flex-wrap:wrap}.address-form{flex-basis:100%;order:2}.browser-toolbar button{min-width:28px;padding:3px 6px}.task-button{max-width:92px;padding:4px;font-size:10px}#startButton{min-width:70px;padding:0 6px;font-size:12px}#clock{min-width:48px;font-size:10px}.submenu{left:auto;right:0;bottom:100%}}
+</style></head><body><main id="desktop">
+ <div class="desktop-icons">
+  <button class="desktop-icon" onclick="newBrowser()"><span class="emoji">🌐</span>Internet Explorer</button>
+  <button class="desktop-icon" onclick="openApp('notepad')"><span class="emoji">📝</span>Bloc de notas</button>
+  <button class="desktop-icon" onclick="openApp('calculator')"><span class="emoji">🧮</span>Calculadora</button>
+ </div>
+</main><footer id="taskbar"><button id="startButton" onclick="toggleStart()">🪟 Inicio</button><div id="taskButtons" style="display:flex;gap:4px;min-width:0;overflow:hidden"></div><div id="clock">00:00</div></footer>
+<div id="startMenu"><div class="start-header">Windows XP</div><div class="start-items">
+<button class="start-item" onclick="newBrowser()">🌐 Nueva ventana de Internet Explorer</button>
+<button class="start-item" onclick="openApp('notepad')">📝 Bloc de notas</button>
+<button class="start-item" onclick="openApp('calculator')">🧮 Calculadora</button>
+<div class="programs"><button class="start-item">📂 Todos los programas　▶</button><div class="submenu">
+<button class="start-item" onclick="newBrowser()">🌐 Internet Explorer</button><button class="start-item" onclick="openApp('notepad')">📝 Bloc de notas</button><button class="start-item" onclick="openApp('calculator')">🧮 Calculadora</button>
+</div></div></div><div class="start-footer"><button onclick="toggleStart(false)">Cerrar menú</button></div></div>
+<script>
+const desktop=document.getElementById("desktop"),taskButtons=document.getElementById("taskButtons"),windows=new Map();
+let nextBrowserId=0,zIndex=10;
+function toggleStart(force){const menu=document.getElementById("startMenu");menu.classList.toggle("open",typeof force==="boolean"?force:!menu.classList.contains("open"))}
+document.addEventListener("click",e=>{const menu=document.getElementById("startMenu");if(!menu.contains(e.target)&&!document.getElementById("startButton").contains(e.target))menu.classList.remove("open")});
+function persistSession(){try{const saved=[];for(const [id,item] of windows){if(id.startsWith("browser-")&&item.browserState)saved.push({url:item.browserState.currentURL||""})}localStorage.setItem("xpOpenBrowsers",JSON.stringify(saved))}catch(e){}}
+function registerWindow(id,title,element,taskButton){windows.set(id,{element,title,taskButton});element.addEventListener("pointerdown",()=>focusWindow(id));taskButton.onclick=()=>{if(element.classList.contains("active"))minimizeWindow(id);else focusWindow(id)}}
+function focusWindow(id){const item=windows.get(id);if(!item)return;item.element.classList.add("active");item.element.style.zIndex=++zIndex;item.taskButton.classList.add("selected");for(const [otherId,other] of windows){if(otherId!==id)other.taskButton.classList.remove("selected")}toggleStart(false);persistSession()}
+function minimizeWindow(id){const item=windows.get(id);if(!item)return;item.element.classList.remove("active");item.taskButton.classList.remove("selected");persistSession()}
+function closeWindow(id){const item=windows.get(id);if(!item)return;if(id.startsWith("browser-")&&window.AndroidBrowser){try{AndroidBrowser.close(id)}catch(e){}}item.element.remove();item.taskButton.remove();windows.delete(id);persistSession()}
+function createWindow(id,title,width="min(900px,82vw)",height="min(620px,80vh)"){const win=document.createElement("section");win.className="window";win.id=id;win.style.width=width;win.style.height=height;win.style.left=(8+(windows.size*3)%24)+"%";win.style.top=(5+(windows.size*3)%18)+"%";const bar=document.createElement("header");bar.className="titlebar";const name=document.createElement("span");name.className="title";name.textContent=title;const controls=document.createElement("div");controls.className="win-controls";const min=document.createElement("button");min.textContent="_";min.title="Minimizar";min.onclick=()=>minimizeWindow(id);const max=document.createElement("button");max.textContent="□";max.title="Maximizar";max.onclick=()=>toggleMaximize(win);const close=document.createElement("button");close.className="close";close.textContent="X";close.title="Cerrar";close.onclick=()=>closeWindow(id);controls.append(min,max,close);bar.append(name,controls);const content=document.createElement("div");content.className="content";win.append(bar,content);desktop.append(win);const task=document.createElement("button");task.className="task-button";task.textContent=title;taskButtons.append(task);registerWindow(id,title,win,task);makeDraggable(win,bar);return{win,content,name,task}}
+function toggleMaximize(win){if(win.dataset.maximized==="true"){win.style.left=win.dataset.oldLeft;win.style.top=win.dataset.oldTop;win.style.width=win.dataset.oldWidth;win.style.height=win.dataset.oldHeight;win.dataset.maximized="false"}else{win.dataset.oldLeft=win.style.left;win.dataset.oldTop=win.style.top;win.dataset.oldWidth=win.style.width;win.dataset.oldHeight=win.style.height;win.style.left="0";win.style.top="0";win.style.width="100%";win.style.height="calc(100% + 38px)";win.dataset.maximized="true"}focusWindow(win.id)}
+function makeDraggable(win,bar){let dragging=false,dx=0,dy=0;bar.addEventListener("pointerdown",e=>{if(e.target.closest(".win-controls")||win.dataset.maximized==="true")return;dragging=true;const rect=win.getBoundingClientRect();dx=e.clientX-rect.left;dy=e.clientY-rect.top;bar.setPointerCapture(e.pointerId)});bar.addEventListener("pointermove",e=>{if(!dragging)return;const maxX=Math.max(0,innerWidth-win.offsetWidth),maxY=Math.max(0,innerHeight-75);win.style.left=Math.max(0,Math.min(maxX,e.clientX-dx))+"px";win.style.top=Math.max(0,Math.min(maxY,e.clientY-dy))+"px"});bar.addEventListener("pointerup",()=>dragging=false);bar.addEventListener("pointercancel",()=>dragging=false)}
+function newBrowser(initialURL="https://example.com"){const id="browser-"+(++nextBrowserId),title="Internet Explorer "+nextBrowserId;const{content,name,task}=createWindow(id,title);const state={history:[],index:-1,currentURL:initialURL};windows.get(id).browserState=state;const menu=document.createElement("div");menu.className="browser-menu";const toolbar=document.createElement("div");toolbar.className="browser-toolbar";const status=document.createElement("div");status.className="status";status.textContent="Preparado";const frame=document.createElement("iframe");frame.className="browser-frame";frame.title=title;frame.referrerPolicy="strict-origin-when-cross-origin";
+function button(label,hint,action){const b=document.createElement("button");b.type="button";b.textContent=label;b.title=hint;b.onclick=action;return b}
+function setStatus(text){status.textContent=text}
+function normalize(value){let address=value.trim();if(!address)return null;if(!address.includes("://")&&!address.includes(".")&&!address.startsWith("localhost"))return"https://www.google.com/search?q="+encodeURIComponent(address);if(!address.includes("://"))address="https://"+address;try{const url=new URL(address);if(!["http:","https:"].includes(url.protocol))return null;return url.href}catch{return null}}
+const form=document.createElement("form");form.className="address-form";const address=document.createElement("input");address.className="address";address.type="text";address.value=initialURL;address.placeholder="Escribe una dirección web o búsqueda...";address.setAttribute("aria-label","Dirección web");const go=document.createElement("button");go.type="submit";go.textContent="Ir";form.append(address,go);
+function navigate(value,save=true){const url=normalize(value);if(!url){setStatus("Dirección no válida.");return}address.value=url;state.currentURL=url;if(save){state.history=state.history.slice(0,state.index+1);state.history.push(url);state.index=state.history.length-1}setStatus("Abriendo "+url);persistSession();if(window.AndroidBrowser){frame.src="about:blank";frame.style.display="none";AndroidBrowser.open(id,url,"Internet Explorer "+id.split("-")[1])}else{frame.style.display="block";frame.src=url}}
+function back(){if(state.index<=0){setStatus("No hay páginas anteriores.");return}state.index--;navigate(state.history[state.index],false)}
+function forward(){if(state.index>=state.history.length-1){setStatus("No hay páginas siguientes.");return}state.index++;navigate(state.history[state.index],false)}
+function reload(){setStatus("Recargando página...");if(window.AndroidBrowser)AndroidBrowser.reload(id);else frame.src=state.currentURL}
+function home(){navigate("https://example.com")}
+function openExternal(){const url=normalize(address.value);if(!url){setStatus("Dirección no válida.");return}newBrowser(url)}
+form.addEventListener("submit",e=>{e.preventDefault();navigate(address.value)});
+frame.addEventListener("load",()=>{if(!window.AndroidBrowser)setStatus("Carga terminada.")});
+toolbar.append(button("◀","Atrás",back),button("▶","Adelante",forward),button("↻","Actualizar",reload),button("⌂","Inicio",home));
+const addressLabel=document.createElement("span");addressLabel.textContent="Dirección:";addressLabel.style.flexShrink="0";toolbar.append(addressLabel,form,button("↗","Abrir en otra pestaña",openExternal),button("＋ Nueva ventana","Crear otra ventana de navegación",()=>newBrowser()));
+menu.append(button("Atrás","Atrás",back),button("Adelante","Adelante",forward),button("Actualizar","Actualizar",reload),button("Inicio","Inicio",home),button("＋ Nueva ventana","Abrir nueva ventana",()=>newBrowser()));
+content.append(menu,toolbar,status,frame);const updateTitle=()=>{const label="Internet Explorer "+id.split("-")[1];name.textContent=label;task.textContent=label};updateTitle();if(initialURL)navigate(initialURL);else setStatus("Listo. Escribe una dirección web y pulsa Ir.");focusWindow(id);return id}
+function restoreSession(){try{const saved=JSON.parse(localStorage.getItem("xpOpenBrowsers")||"[]");if(!saved.length){newBrowser("");return}saved.slice(0,6).forEach(entry=>{const id=newBrowser("");const item=windows.get(id);if(item&&entry.url){item.browserState.currentURL=entry.url;const input=item.element.querySelector(".address");if(input)input.value=entry.url;const status=item.element.querySelector(".status");if(status)status.textContent="Sesión recuperada. Pulsa Ir para volver a abrir la página."}})}catch(e){newBrowser("")}}
+function openApp(app){if(app==="notepad"){if(windows.has("notepad")){focusWindow("notepad");return}const{content}=createWindow("notepad","Bloc de notas","min(750px,85vw)","min(550px,80vh)");const menu=document.createElement("div");menu.className="notepad-menu";menu.textContent="Bloc de notas — el texto se guarda automáticamente en este navegador. ";const save=document.createElement("button");save.textContent="Descargar .txt";const textarea=document.createElement("textarea");textarea.className="notepad-text";textarea.placeholder="Escribe aquí...";try{textarea.value=localStorage.getItem("xpNotepad")||""}catch{}textarea.addEventListener("input",()=>{try{localStorage.setItem("xpNotepad",textarea.value)}catch{}});save.onclick=()=>{const blob=new Blob([textarea.value],{type:"text/plain;charset=utf-8"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="bloc-de-notas.txt";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};menu.append(save);content.append(menu,textarea);focusWindow("notepad")}
+if(app==="calculator"){if(windows.has("calculator")){focusWindow("calculator");return}const{content}=createWindow("calculator","Calculadora","300px","410px");const calc=document.createElement("div");calc.className="calculator";const display=document.createElement("input");display.className="calc-display";display.value="0";display.readOnly=true;const grid=document.createElement("div");grid.className="calc-grid";let expression="0",fresh=true;function update(){display.value=expression}function add(v){if(fresh&&/[0-9.(]/.test(v))expression=v;else if(expression==="0"&&/[0-9.(]/.test(v))expression=v;else expression+=v;fresh=false;update()}function clear(){expression="0";fresh=true;update()}function del(){expression=expression.length>1?expression.slice(0,-1):"0";update()}function calculate(){try{if(!/^[0-9+\-*/().\s]+$/.test(expression))throw Error();const result=Function('"use strict";return ('+expression+')')();if(!Number.isFinite(result))throw Error();expression=String(result)}catch{expression="Error"}fresh=true;update()}[["C",clear],["⌫",del],["÷",()=>add("/")],["×",()=>add("*")],["7",()=>add("7")],["8",()=>add("8")],["9",()=>add("9")],["−",()=>add("-")],["4",()=>add("4")],["5",()=>add("5")],["6",()=>add("6")],["+",()=>add("+")],["1",()=>add("1")],["2",()=>add("2")],["3",()=>add("3")],["=",calculate],["0",()=>add("0")],[".",()=>add(".")],["(",()=>add("(")],[")",()=>add(")")]].forEach(([label,action])=>{const b=document.createElement("button");b.textContent=label;b.onclick=action;grid.append(b)});calc.append(display,grid);content.append(calc);focusWindow("calculator")}}
+function updateClock(){document.getElementById("clock").textContent=new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}
+updateClock();setInterval(updateClock,1000);restoreSession();
+</script></body></html>
