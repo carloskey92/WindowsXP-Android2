@@ -612,3 +612,11 @@ fun activarVideoFlotante() {
         enterVideoPip()
     }
 }
+private inner class VideoPipBridge {
+    @android.webkit.JavascriptInterface
+    fun activar() {
+        runOnUiThread {
+            enterVideoPip()
+        }
+    }
+}
