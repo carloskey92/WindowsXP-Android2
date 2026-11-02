@@ -606,3 +606,9 @@ override fun onPictureInPictureModeChanged(
         super.onDestroy()
     }
 }
+@android.webkit.JavascriptInterface
+fun activarVideoFlotante() {
+    runOnUiThread {
+        enterVideoPip()
+    }
+}
