@@ -143,6 +143,29 @@ class MainActivity : Activity() {
             }
 
             addJavascriptInterface(AndroidBrowserBridge(), "AndroidBrowser")
+private fun createDesktopWebView(): WebView {
+    return WebView(this).apply {
+        setBackgroundColor(Color.rgb(8, 97, 174))
+
+        settings.apply {
+            javaScriptEnabled = true
+            domStorageEnabled = true
+            databaseEnabled = true
+            loadsImagesAutomatically = true
+            javaScriptCanOpenWindowsAutomatically = true
+            setSupportMultipleWindows(false)
+            cacheMode = WebSettings.LOAD_DEFAULT
+            allowFileAccess = true
+            allowContentAccess = true
+            mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
+            userAgentString = userAgentString + " WindowsXPSimulatorAndroid"
+        }
+
+        addJavascriptInterface(AndroidBrowserBridge(), "AndroidBrowser")
+        addJavascriptInterface(VideoPipBridge(), "VideoPip")
+
+        webChromeClient = WebChromeClient()
+            
             addJavascriptInterface(AndroidVideoBridge(), "AndroidVideo")
 
             webChromeClient = WebChromeClient()
