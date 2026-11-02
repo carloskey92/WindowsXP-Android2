@@ -315,12 +315,12 @@ class MainActivity : Activity() {
         }
 
         val addressBar = EditText(this).apply {
-            hint = "https://www.example.com"
-            singleLine = true
-            textSize = 14f
-            setText(initialUrl)
-            setPadding(10, 6, 10, 6)
-        }
+    hint = "https://www.example.com"
+    setSingleLine(true)
+    textSize = 14f
+    setText(initialUrl)
+    setPadding(10, 6, 10, 6)
+}
 
         browserAddresses[id] = addressBar
 
