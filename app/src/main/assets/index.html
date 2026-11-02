@@ -93,6 +93,16 @@ function openExternal(){const url=normalize(address.value);if(!url){setStatus("D
 form.addEventListener("submit",e=>{e.preventDefault();navigate(address.value)});
 frame.addEventListener("load",()=>{if(!window.AndroidBrowser)setStatus("Carga terminada.")});
 toolbar.append(button("◀","Atrás",back),button("▶","Adelante",forward),button("↻","Actualizar",reload),button("⌂","Inicio",home));
+toolbar.append(
+    button("📺 Video flotante", "Activar ventana flotante", () => {
+        if (window.VideoPip && typeof VideoPip.activar === "function") {
+            VideoPip.activar();
+            setStatus("Solicitando modo de video flotante...");
+        } else {
+            setStatus("El modo flotante no está disponible.");
+        }
+    })
+);                                                      
 const addressLabel=document.createElement("span");addressLabel.textContent="Dirección:";addressLabel.style.flexShrink="0";toolbar.append(addressLabel,form,button("↗","Abrir en otra pestaña",openExternal),button("＋ Nueva ventana","Crear otra ventana de navegación",()=>newBrowser()));
 menu.append(button("Atrás","Atrás",back),button("Adelante","Adelante",forward),button("Actualizar","Actualizar",reload),button("Inicio","Inicio",home),button("＋ Nueva ventana","Abrir nueva ventana",()=>newBrowser()));
 content.append(menu,toolbar,status,frame);const updateTitle=()=>{const label="Internet Explorer "+id.split("-")[1];name.textContent=label;task.textContent=label};updateTitle();if(initialURL)navigate(initialURL);else setStatus("Listo. Escribe una dirección web y pulsa Ir.");focusWindow(id);return id}
