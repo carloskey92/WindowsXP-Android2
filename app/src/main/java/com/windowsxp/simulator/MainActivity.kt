@@ -1,14 +1,10 @@
 package com.windowsxp.simulator
 
-import android.app.PictureInPictureParams
-import android.content.res.Configuration
-import android.util.Rational
-import android.Manifest
 import android.app.Activity
 import android.app.Dialog
 import android.app.PictureInPictureParams
-import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -37,184 +33,138 @@ class MainActivity : Activity() {
 
     private lateinit var desktopView: WebView
 
-    private val stateKey = "xp_webview_state"
+    private val stateKey = "windows_xp_state"
+
     private val browserDialogs = mutableMapOf<String, Dialog>()
     private val browserViews = mutableMapOf<String, WebView>()
     private val browserAddresses = mutableMapOf<String, EditText>()
 
-    @Volatile
+    private val videoStates = mutableMapOf<String, Boolean>()
+
     private var videoPlaying = false
+
+    // ---------------------------------------------------------
+    // INICIO DE LA APLICACIÓN
+    // ---------------------------------------------------------
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         hideSystemBars()
 
         desktopView = createDesktopWebView()
         setContentView(desktopView)
 
-        val restored = savedInstanceState?.getBundle(stateKey)
-        val didRestore =
-            restored != null && desktopView.restoreState(restored) != null
+        if (savedInstanceState != null) {
+            val savedHtml = savedInstanceState.getString(stateKey)
 
-        if (!didRestore) {
-            desktopView.loadUrl("file:///android_asset/index.html")
+            if (!savedHtml.isNullOrEmpty()) {
+                desktopView.restoreState(savedInstanceState)
+            } else {
+                loadDesktop()
+            }
+        } else {
+            loadDesktop()
         }
 
         startKeepAliveService()
         requestNotificationPermission()
     }
 
-    private inner class AndroidVideoBridge {
-
-        @JavascriptInterface
-        fun setVideoPlaying(playing: Boolean) {
-            runOnUiThread {
-                videoPlaying = playing
-                updatePictureInPictureParams()
-            }
-        }
+    private fun loadDesktop() {
+        desktopView.loadUrl("file:///android_asset/index.html")
     }
 
-    private fun updatePictureInPictureParams() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            try {
-                val params = PictureInPictureParams.Builder()
-                    .setAspectRatio(Rational(16, 9))
-                    .setAutoEnterEnabled(
-                        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && videoPlaying
-                    )
-                    .build()
-
-                setPictureInPictureParams(params)
-            } catch (_: Exception) {
-            }
-        }
-    }
-
-    private fun installVideoDetector(web: WebView) {
-        val script = """
-            (function() {
-                if (window.__xpVideoDetectorInstalled) return;
-                window.__xpVideoDetectorInstalled = true;
-
-                function checkVideos() {
-                    var playing = Array.from(document.querySelectorAll('video'))
-                        .some(function(v) {
-                            return !v.paused && !v.ended && v.readyState >= 2;
-                        });
-
-                    if (window.AndroidVideo) {
-                        AndroidVideo.setVideoPlaying(playing);
-                    }
-                }
-
-                document.addEventListener('play', checkVideos, true);
-                document.addEventListener('pause', checkVideos, true);
-                document.addEventListener('ended', checkVideos, true);
-
-                setInterval(checkVideos, 1000);
-                checkVideos();
-            })();
-        """.trimIndent()
-
-        web.evaluateJavascript(script, null)
-    }
+    // ---------------------------------------------------------
+    // WEBVIEW DEL ESCRITORIO WINDOWS XP
+    // ---------------------------------------------------------
 
     private fun createDesktopWebView(): WebView {
-        return WebView(this).apply {
+        val web = WebView(this)
 
-            setBackgroundColor(Color.rgb(8, 97, 174))
+        configureWebView(web)
 
-            settings.apply {
-                javaScriptEnabled = true
-                domStorageEnabled = true
-                databaseEnabled = true
-                loadsImagesAutomatically = true
-                javaScriptCanOpenWindowsAutomatically = true
-                setSupportMultipleWindows(false)
-                cacheMode = WebSettings.LOAD_DEFAULT
-                allowFileAccess = true
-                allowContentAccess = true
-                mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
-                userAgentString = userAgentString + " WindowsXPSimulatorAndroid"
+        web.addJavascriptInterface(
+            AndroidBrowserBridge(),
+            "AndroidBrowser"
+        )
+
+        web.addJavascriptInterface(
+            VideoPipBridge(),
+            "VideoPip"
+        )
+
+        web.webChromeClient = WebChromeClient()
+
+        web.webViewClient = object : WebViewClient() {
+
+            override fun onRenderProcessGone(
+                view: WebView,
+                detail: RenderProcessGoneDetail
+            ): Boolean {
+                try {
+                    view.destroy()
+                } catch (_: Exception) {
+                }
+
+                desktopView = createDesktopWebView()
+                setContentView(desktopView)
+                loadDesktop()
+
+                return true
             }
+        }
 
-            addJavascriptInterface(AndroidBrowserBridge(), "AndroidBrowser")
-private fun createDesktopWebView(): WebView {
-    return WebView(this).apply {
-        setBackgroundColor(Color.rgb(8, 97, 174))
+        return web
+    }
 
-        settings.apply {
+    private fun configureWebView(web: WebView) {
+        web.settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true
             databaseEnabled = true
             loadsImagesAutomatically = true
             javaScriptCanOpenWindowsAutomatically = true
-            setSupportMultipleWindows(false)
-            cacheMode = WebSettings.LOAD_DEFAULT
-            allowFileAccess = true
-            allowContentAccess = true
-            mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
-            userAgentString = userAgentString + " WindowsXPSimulatorAndroid"
+            setSupportMultipleWindows(true)
+            builtInZoomControls = true
+            displayZoomControls = false
+            mixedContentMode =
+                WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
         }
 
-        addJavascriptInterface(AndroidBrowserBridge(), "AndroidBrowser")
-        addJavascriptInterface(VideoPipBridge(), "VideoPip")
+        web.setBackgroundColor(Color.WHITE)
 
-        webChromeClient = WebChromeClient()
-            
-            addJavascriptInterface(AndroidVideoBridge(), "AndroidVideo")
-
-            webChromeClient = WebChromeClient()
-
-            webViewClient = object : WebViewClient() {
-
-                override fun onPageFinished(view: WebView, url: String?) {
-                    super.onPageFinished(view, url)
-                    installVideoDetector(view)
-                }
-
-                override fun onRenderProcessGone(
-                    view: WebView,
-                    detail: RenderProcessGoneDetail
-                ): Boolean {
-
-                    if (view.parent is android.view.ViewGroup) {
-                        (view.parent as android.view.ViewGroup).removeView(view)
-                    }
-
-                    view.destroy()
-
-                    desktopView = createDesktopWebView()
-                    setContentView(desktopView)
-                    desktopView.loadUrl("file:///android_asset/index.html")
-
-                    return true
-                }
-            }
-        }
+        web.isFocusable = true
+        web.isFocusableInTouchMode = true
     }
 
-    private inner class AndroidBrowserBridge {
+    // ---------------------------------------------------------
+    // COMUNICACIÓN ENTRE JAVASCRIPT Y ANDROID
+    // ---------------------------------------------------------
+
+    inner class AndroidBrowserBridge {
 
         @JavascriptInterface
         fun open(id: String, url: String, title: String) {
-            runOnUiThread { showBrowser(id, url, title) }
+            runOnUiThread {
+                showBrowser(id, url, title)
+            }
         }
 
         @JavascriptInterface
         fun close(id: String) {
-            runOnUiThread { closeBrowser(id) }
+            runOnUiThread {
+                closeBrowser(id)
+            }
         }
 
         @JavascriptInterface
         fun back(id: String) {
             runOnUiThread {
-                browserViews[id]?.let {
-                    if (it.canGoBack()) it.goBack()
+                browserViews[id]?.let { web ->
+                    if (web.canGoBack()) {
+                        web.goBack()
+                    }
                 }
             }
         }
@@ -222,8 +172,10 @@ private fun createDesktopWebView(): WebView {
         @JavascriptInterface
         fun forward(id: String) {
             runOnUiThread {
-                browserViews[id]?.let {
-                    if (it.canGoForward()) it.goForward()
+                browserViews[id]?.let { web ->
+                    if (web.canGoForward()) {
+                        web.goForward()
+                    }
                 }
             }
         }
@@ -236,226 +188,330 @@ private fun createDesktopWebView(): WebView {
         }
     }
 
-    private fun showBrowser(id: String, url: String, title: String) {
+    // ---------------------------------------------------------
+    // BOTÓN PARA ACTIVAR PICTURE-IN-PICTURE
+    // ---------------------------------------------------------
 
-        if (!url.startsWith("https://") && !url.startsWith("http://")) return
+    inner class VideoPipBridge {
 
-        val existing = browserViews[id]
+        @JavascriptInterface
+        fun activar() {
+            runOnUiThread {
+                enterVideoPip()
+            }
+        }
+    }
 
-        if (existing != null) {
-            browserAddresses[id]?.setText(url)
-            existing.loadUrl(url)
-            browserDialogs[id]?.show()
-            return
+    // ---------------------------------------------------------
+    // DETECCIÓN DE VIDEO EN LAS VENTANAS DEL NAVEGADOR
+    // ---------------------------------------------------------
+
+    inner class AndroidVideoBridge(
+        private val browserId: String
+    ) {
+
+        @JavascriptInterface
+        fun setVideoPlaying(playing: Boolean) {
+            runOnUiThread {
+                videoStates[browserId] = playing
+                updateVideoPlayingState()
+            }
+        }
+    }
+
+    private fun updateVideoPlayingState() {
+        videoPlaying = videoStates.values.any { it }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            updatePictureInPictureParams()
+        }
+    }
+
+    private fun installVideoDetector(web: WebView) {
+        val script = """
+            (function() {
+                if (window.__androidVideoDetectorInstalled) return;
+                window.__androidVideoDetectorInstalled = true;
+
+                function checkVideos() {
+                    try {
+                        var videos = document.querySelectorAll('video');
+                        var playing = false;
+
+                        for (var i = 0; i < videos.length; i++) {
+                            var v = videos[i];
+
+                            if (!v.paused && !v.ended &&
+                                v.readyState >= 2) {
+                                playing = true;
+                                break;
+                            }
+                        }
+
+                        if (window.AndroidVideo) {
+                            window.AndroidVideo.setVideoPlaying(playing);
+                        }
+                    } catch (e) {}
+                }
+
+                document.addEventListener(
+                    'play', checkVideos, true
+                );
+
+                document.addEventListener(
+                    'pause', checkVideos, true
+                );
+
+                document.addEventListener(
+                    'ended', checkVideos, true
+                );
+
+                setInterval(checkVideos, 1500);
+
+                checkVideos();
+            })();
+        """.trimIndent()
+
+        web.evaluateJavascript(script, null)
+    }
+
+    // ---------------------------------------------------------
+    // VENTANAS NATIVAS DE INTERNET EXPLORER
+    // ---------------------------------------------------------
+
+    private fun showBrowser(
+        id: String,
+        initialUrl: String,
+        title: String
+    ) {
+        // Evitar duplicar una ventana con el mismo identificador.
+        browserDialogs[id]?.let { existing ->
+            if (existing.isShowing) {
+                existing.show()
+                return
+            }
         }
 
         val dialog = Dialog(this)
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.rgb(238, 236, 226))
+            setBackgroundColor(Color.rgb(235, 235, 235))
         }
 
         val heading = TextView(this).apply {
-            text = title
+            text = if (title.isBlank()) {
+                "Internet Explorer"
+            } else {
+                title
+            }
+
             setTextColor(Color.WHITE)
             textSize = 16f
             typeface = Typeface.DEFAULT_BOLD
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(14, 10, 14, 10)
-
-            background = GradientDrawable(
-                GradientDrawable.Orientation.TOP_BOTTOM,
-                intArrayOf(
-                    Color.rgb(55, 145, 240),
-                    Color.rgb(13, 77, 183)
-                )
-            )
+            setPadding(14, 8, 14, 8)
+            setBackgroundColor(Color.rgb(0, 75, 160))
         }
 
-        val controls = LinearLayout(this).apply {
+        val addressBar = EditText(this).apply {
+            hint = "https://www.example.com"
+            singleLine = true
+            textSize = 14f
+            setText(initialUrl)
+            setPadding(10, 6, 10, 6)
+        }
+
+        browserAddresses[id] = addressBar
+
+        val toolbar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(5, 5, 5, 5)
+            setPadding(4, 4, 4, 4)
         }
 
-        fun control(label: String, action: () -> Unit): Button {
-            return Button(this).apply {
+        fun addToolButton(
+            label: String,
+            action: () -> Unit
+        ) {
+            val button = Button(this).apply {
                 text = label
                 textSize = 12f
                 isAllCaps = false
-                setPadding(4, 0, 4, 0)
-                setOnClickListener { action() }
+                setPadding(2, 0, 2, 0)
+            }
+
+            toolbar.addView(
+                button,
+                LinearLayout.LayoutParams(
+                    0,
+                    44,
+                    1f
+                )
+            )
+
+            button.setOnClickListener {
+                action()
             }
         }
 
-        val address = EditText(this).apply {
-            setSingleLine(true)
-            textSize = 13f
-            setText(url)
-            hint = "https://sitio.com"
-            imeOptions =
-                android.view.inputmethod.EditorInfo.IME_ACTION_GO
-        }
+        val web = WebView(this)
 
-        browserAddresses[id] = address
+        configureWebView(web)
 
-        val web = WebView(this).apply {
-
-            settings.apply {
-                javaScriptEnabled = true
-                domStorageEnabled = true
-                databaseEnabled = true
-                loadsImagesAutomatically = true
-                javaScriptCanOpenWindowsAutomatically = true
-                setSupportMultipleWindows(false)
-                mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
-                cacheMode = WebSettings.LOAD_DEFAULT
-                allowFileAccess = false
-                allowContentAccess = true
-
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    safeBrowsingEnabled = true
-                }
-            }
-
-            addJavascriptInterface(AndroidVideoBridge(), "AndroidVideo")
-
-            CookieManager.getInstance().setAcceptCookie(true)
-            CookieManager.getInstance()
-                .setAcceptThirdPartyCookies(this, true)
-
-            webChromeClient = WebChromeClient()
-
-            webViewClient = object : WebViewClient() {
-
-                override fun shouldOverrideUrlLoading(
-                    view: WebView,
-                    request: WebResourceRequest
-                ): Boolean {
-                    val scheme = request.url.scheme ?: return true
-                    return scheme != "http" && scheme != "https"
-                }
-
-                override fun onPageStarted(
-                    view: WebView,
-                    pageUrl: String?,
-                    favicon: android.graphics.Bitmap?
-                ) {
-                    if (!pageUrl.isNullOrBlank()) {
-                        address.setText(pageUrl)
-                    }
-                }
-
-                override fun onPageFinished(
-                    view: WebView,
-                    pageUrl: String?
-                ) {
-                    if (!pageUrl.isNullOrBlank()) {
-                        address.setText(pageUrl)
-                    }
-
-                    installVideoDetector(view)
-                }
-
-                override fun onRenderProcessGone(
-                    view: WebView,
-                    detail: RenderProcessGoneDetail
-                ): Boolean {
-                    if (view.parent is android.view.ViewGroup) {
-                        (view.parent as android.view.ViewGroup).removeView(view)
-                    }
-                    browserViews.remove(id)
-                    view.destroy()
-                    closeBrowser(id)
-                    return true
-                }
-            }
-        }
-
-        browserViews[id] = web
-
-        address.setOnEditorActionListener { _, actionId, event ->
-
-            if (
-                actionId == android.view.inputmethod.EditorInfo.IME_ACTION_GO ||
-                event?.keyCode == KeyEvent.KEYCODE_ENTER
-            ) {
-
-                var target = address.text.toString().trim()
-
-                if (target.isNotEmpty()) {
-                    if (!target.contains("://")) {
-                        target = "https://$target"
-                    }
-
-                    if (
-                        target.startsWith("https://") ||
-                        target.startsWith("http://")
-                    ) {
-                        web.loadUrl(target)
-                    }
-                }
-
-                true
-            } else {
-                false
-            }
-        }
-
-        controls.addView(control("‹") {
-            if (web.canGoBack()) web.goBack()
-        })
-
-        controls.addView(control("›") {
-            if (web.canGoForward()) web.goForward()
-        })
-
-        controls.addView(control("↻") {
-            web.reload()
-        })
-
-        controls.addView(
-            address,
-            LinearLayout.LayoutParams(0, -2, 1f)
+        web.addJavascriptInterface(
+            AndroidVideoBridge(id),
+            "AndroidVideo"
         )
 
-        controls.addView(control("Cerrar") {
-            dialog.dismiss()
-        })
+        web.webChromeClient = WebChromeClient()
 
-        root.addView(heading)
-        root.addView(controls)
+        addToolButton("←") {
+            if (web.canGoBack()) web.goBack()
+        }
+
+        addToolButton("→") {
+            if (web.canGoForward()) web.goForward()
+        }
+
+        addToolButton("↻") {
+            web.reload()
+        }
+
+        addToolButton("Ir") {
+            navigateBrowser(web, addressBar.text.toString())
+        }
+
+        addToolButton("✕") {
+            closeBrowser(id)
+        }
+
+        root.addView(
+            heading,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                42
+            )
+        )
+
+        root.addView(
+            addressBar,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                50
+            )
+        )
+
+        root.addView(
+            toolbar,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                48
+            )
+        )
 
         root.addView(
             web,
-            LinearLayout.LayoutParams(-1, 0, 1f)
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                0,
+                1f
+            )
         )
 
         dialog.setContentView(root)
 
-        dialog.setOnDismissListener {
-            browserViews.remove(id)?.destroy()
-            browserAddresses.remove(id)
-            browserDialogs.remove(id)
-            videoPlaying = false
-        }
+        dialog.window?.apply {
+            setLayout(
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.MATCH_PARENT
+            )
 
-        dialog.setOnKeyListener { _, keyCode, event ->
-
-            if (
-                keyCode == KeyEvent.KEYCODE_BACK &&
-                event.action == KeyEvent.ACTION_UP &&
-                web.canGoBack()
-            ) {
-                web.goBack()
-                true
-            } else {
-                false
-            }
+            setSoftInputMode(
+                WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+            )
         }
 
         browserDialogs[id] = dialog
+        browserViews[id] = web
+
+        web.webViewClient = object : WebViewClient() {
+
+            override fun shouldOverrideUrlLoading(
+                view: WebView,
+                request: WebResourceRequest
+            ): Boolean {
+                val url = request.url.toString()
+
+                return if (
+                    url.startsWith("https://") ||
+                    url.startsWith("http://")
+                ) {
+                    false
+                } else {
+                    true
+                }
+            }
+
+            override fun onPageStarted(
+                view: WebView,
+                url: String,
+                favicon: android.graphics.Bitmap?
+            ) {
+                addressBar.setText(url)
+            }
+
+            override fun onPageFinished(
+                view: WebView,
+                url: String
+            ) {
+                addressBar.setText(url)
+                installVideoDetector(view)
+            }
+
+            override fun onRenderProcessGone(
+                view: WebView,
+                detail: RenderProcessGoneDetail
+            ): Boolean {
+                videoStates.remove(id)
+                updateVideoPlayingState()
+
+                browserViews.remove(id)
+                browserAddresses.remove(id)
+
+                try {
+                    view.destroy()
+                } catch (_: Exception) {
+                }
+
+                browserDialogs.remove(id)?.dismiss()
+
+                Toast.makeText(
+                    this@MainActivity,
+                    "La ventana del navegador se cerró por un error.",
+                    Toast.LENGTH_LONG
+                ).show()
+
+                return true
+            }
+        }
+
+        dialog.setOnDismissListener {
+            videoStates.remove(id)
+            updateVideoPlayingState()
+
+            browserViews.remove(id)
+            browserAddresses.remove(id)
+            browserDialogs.remove(id)
+
+            try {
+                web.stopLoading()
+                web.loadUrl("about:blank")
+                web.removeAllViews()
+                web.destroy()
+            } catch (_: Exception) {
+            }
+        }
 
         dialog.show()
 
@@ -464,30 +520,126 @@ private fun createDesktopWebView(): WebView {
             WindowManager.LayoutParams.MATCH_PARENT
         )
 
-        web.loadUrl(url)
+        navigateBrowser(web, initialUrl)
     }
+
+    private fun navigateBrowser(web: WebView, input: String) {
+        var url = input.trim()
+
+        if (url.isEmpty()) {
+            return
+        }
+
+        if (!url.contains("://")) {
+            url = if (
+                url.contains(".") &&
+                !url.contains(" ")
+            ) {
+                "https://$url"
+            } else {
+                "https://www.google.com/search?q=" +
+                    java.net.URLEncoder.encode(
+                        url,
+                        "UTF-8"
+                    )
+            }
+        }
+
+        if (
+            url.startsWith("https://") ||
+            url.startsWith("http://")
+        ) {
+            web.loadUrl(url)
+        } else {
+            Toast.makeText(
+                this,
+                "Dirección no compatible.",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
+
+    private fun closeBrowser(id: String) {
+        browserDialogs[id]?.dismiss()
+    }
+
+    // ---------------------------------------------------------
+    // PICTURE-IN-PICTURE
+    // ---------------------------------------------------------
+
+    private fun enterVideoPip() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            Toast.makeText(
+                this,
+                "El modo flotante requiere Android 8.0 o posterior.",
+                Toast.LENGTH_LONG
+            ).show()
+            return
+        }
+
+        if (
+            !packageManager.hasSystemFeature(
+                PackageManager.FEATURE_PICTURE_IN_PICTURE
+            )
+        ) {
+            Toast.makeText(
+                this,
+                "Este dispositivo no admite Picture-in-Picture.",
+                Toast.LENGTH_LONG
+            ).show()
+            return
+        }
+
+        try {
+            val params = PictureInPictureParams.Builder()
+                .setAspectRatio(Rational(16, 9))
+                .build()
+
+            enterPictureInPictureMode(params)
+        } catch (e: Exception) {
+            Toast.makeText(
+                this,
+                "No se pudo activar el modo flotante.",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+    }
+
+    private fun updatePictureInPictureParams() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            return
+        }
+
+        try {
+            val builder = PictureInPictureParams.Builder()
+                .setAspectRatio(Rational(16, 9))
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                builder.setAutoEnterEnabled(videoPlaying)
+            }
+
+            setPictureInPictureParams(builder.build())
+        } catch (_: Exception) {
+        }
+    }
+
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
 
+        // En Android 8 a Android 11, intentar entrar
+        // automáticamente a PiP cuando se detecta video.
         if (
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
-            videoPlaying &&
-            !isInPictureInPictureMode
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.S &&
+            videoPlaying
         ) {
-            try {
-                val params = PictureInPictureParams.Builder()
-                    .setAspectRatio(Rational(16, 9))
-                    .build()
-
-                enterPictureInPictureMode(params)
-            } catch (_: Exception) {
-            }
+            enterVideoPip()
         }
     }
 
     override fun onPictureInPictureModeChanged(
         isInPictureInPictureMode: Boolean,
-        newConfig: android.content.res.Configuration
+        newConfig: Configuration
     ) {
         super.onPictureInPictureModeChanged(
             isInPictureInPictureMode,
@@ -495,158 +647,154 @@ private fun createDesktopWebView(): WebView {
         )
 
         if (isInPictureInPictureMode) {
-            window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+            // La ventana de la actividad pasa al modo flotante.
         } else {
             hideSystemBars()
         }
     }
 
-    private fun closeBrowser(id: String) {
-        browserDialogs[id]?.dismiss()
-    }
-private inner class VideoPipBridge {
-    @android.webkit.JavascriptInterface
-    fun activar() {
-        runOnUiThread {
-            enterVideoPip()
-        }
-    }
-}
-    private fun startKeepAliveService() {
-        val intent = Intent(this, KeepAliveService::class.java)
+    // ---------------------------------------------------------
+    // SERVICIO EN SEGUNDO PLANO
+    // ---------------------------------------------------------
 
+    private fun startKeepAliveService() {
         try {
+            val serviceIntent = android.content.Intent(
+                this,
+                KeepAliveService::class.java
+            )
+
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                startForegroundService(intent)
+                startForegroundService(serviceIntent)
             } else {
-                startService(intent)
+                startService(serviceIntent)
             }
         } catch (_: Exception) {
-            Toast.makeText(
-                this,
-                "No se pudo iniciar la notificación de sesión.",
-                Toast.LENGTH_LONG
-            ).show()
         }
     }
 
     private fun requestNotificationPermission() {
-        if (
-            Build.VERSION.SDK_INT >= 33 &&
-            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) !=
-            PackageManager.PERMISSION_GRANTED
-        ) {
-            requestPermissions(
-                arrayOf(Manifest.permission.POST_NOTIFICATIONS),
-                100
-            )
+        if (Build.VERSION.SDK_INT >= 33) {
+            if (
+                checkSelfPermission(
+                    android.Manifest.permission.POST_NOTIFICATIONS
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                requestPermissions(
+                    arrayOf(
+                        android.Manifest.permission.POST_NOTIFICATIONS
+                    ),
+                    1001
+                )
+            }
         }
     }
 
+    // ---------------------------------------------------------
+    // PANTALLA COMPLETA
+    // ---------------------------------------------------------
+
+    @Suppress("DEPRECATION")
     private fun hideSystemBars() {
-        @Suppress("DEPRECATION")
-        window.decorView.systemUiVisibility =
-            (View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-                or View.SYSTEM_UI_FLAG_FULLSCREEN
-                or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            window.setDecorFitsSystemWindows(false)
+
+            window.insetsController?.let { controller ->
+                controller.hide(
+                    android.view.WindowInsets.Type.statusBars() or
+                        android.view.WindowInsets.Type.navigationBars()
+                )
+
+                controller.systemBarsBehavior =
+                    android.view.WindowInsetsController
+                        .BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            }
+        } else {
+            window.decorView.systemUiVisibility =
+                (
+                    View.SYSTEM_UI_FLAG_FULLSCREEN or
+                        View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+                        View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
+                        View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
+                        View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or
+                        View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                    )
+        }
     }
 
+    // ---------------------------------------------------------
+    // GUARDAR Y RESTAURAR ESTADO
+    // ---------------------------------------------------------
+
     override fun onSaveInstanceState(outState: Bundle) {
-        val webState = Bundle()
-        desktopView.saveState(webState)
-        outState.putBundle(stateKey, webState)
+        try {
+            desktopView.saveState(outState)
+        } catch (_: Exception) {
+        }
+
         super.onSaveInstanceState(outState)
     }
 
-    @Deprecated("Deprecated in Android API")
+    // ---------------------------------------------------------
+    // BOTÓN ATRÁS
+    // ---------------------------------------------------------
+
+    @Deprecated("Deprecated in Android")
     override fun onBackPressed() {
-        val active = browserDialogs.entries.lastOrNull()
-
-        if (active != null) {
-            val web = browserViews[active.key]
-
-            if (web?.canGoBack() == true) {
-                web.goBack()
-            } else {
-                active.value.dismiss()
-            }
-        } else if (desktopView.canGoBack()) {
-            desktopView.goBack()
-        } else {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+            isInPictureInPictureMode
+        ) {
             super.onBackPressed()
+            return
         }
-        private fun enterVideoPip() {
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
-        Toast.makeText(
-            this,
-            "La ventana flotante requiere Android 8.0 o posterior.",
-            Toast.LENGTH_LONG
-        ).show()
-        return
+
+        val activeBrowser = browserViews.entries.lastOrNull()
+
+        if (activeBrowser != null) {
+            val web = activeBrowser.value
+
+            if (web.canGoBack()) {
+                web.goBack()
+                return
+            }
+
+            closeBrowser(activeBrowser.key)
+            return
+        }
+
+        if (::desktopView.isInitialized && desktopView.canGoBack()) {
+            desktopView.goBack()
+            return
+        }
+
+        super.onBackPressed()
     }
 
-    if (!packageManager.hasSystemFeature(
-            PackageManager.FEATURE_PICTURE_IN_PICTURE
-        )
-    ) {
-        Toast.makeText(
-            this,
-            "Este dispositivo no admite Picture-in-Picture.",
-            Toast.LENGTH_LONG
-        ).show()
-        return
-    }
-
-    try {
-        val params = PictureInPictureParams.Builder()
-            .setAspectRatio(Rational(16, 9))
-            .build()
-
-        enterPictureInPictureMode(params)
-    } catch (e: Exception) {
-        Toast.makeText(
-            this,
-            "No se pudo abrir la ventana flotante.",
-            Toast.LENGTH_LONG
-        ).show()
-    }
-}
-
-override fun onPictureInPictureModeChanged(
-    isInPictureInPictureMode: Boolean,
-    newConfig: Configuration
-) {
-    super.onPictureInPictureModeChanged(
-        isInPictureInPictureMode,
-        newConfig
-    )
-
-    if (isInPictureInPictureMode) {
-        window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-    } else {
-        hideSystemBars()
-    }
-}
-    }
+    // ---------------------------------------------------------
+    // CIERRE
+    // ---------------------------------------------------------
 
     override fun onDestroy() {
-        super.onDestroy()
-    }
-}
-@android.webkit.JavascriptInterface
-fun activarVideoFlotante() {
-    runOnUiThread {
-        enterVideoPip()
-    }
-}
-private inner class VideoPipBridge {
-    @android.webkit.JavascriptInterface
-    fun activar() {
-        runOnUiThread {
-            enterVideoPip()
+        for (dialog in browserDialogs.values.toList()) {
+            try {
+                dialog.dismiss()
+            } catch (_: Exception) {
+            }
         }
+
+        browserDialogs.clear()
+        browserViews.clear()
+        browserAddresses.clear()
+        videoStates.clear()
+
+        try {
+            if (::desktopView.isInitialized) {
+                desktopView.stopLoading()
+                desktopView.destroy()
+            }
+        } catch (_: Exception) {
+        }
+
+        super.onDestroy()
     }
 }
