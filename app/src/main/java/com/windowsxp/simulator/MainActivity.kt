@@ -67,7 +67,7 @@ class MainActivity : Activity() {
             loadDesktop()
         }
 
-        startKeepAliveService()
+       // startKeepAliveService()
         requestNotificationPermission()
     }
 
