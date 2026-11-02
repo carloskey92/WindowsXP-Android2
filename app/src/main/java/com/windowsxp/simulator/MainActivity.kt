@@ -440,11 +440,6 @@ class MainActivity : Activity() {
 
         web.loadUrl(url)
     }
-
-    private fun closeBrowser(id: String) {
-        browserDialogs[id]?.dismiss()
-    }
-
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
 
